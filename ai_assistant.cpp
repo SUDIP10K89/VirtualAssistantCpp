@@ -3,105 +3,97 @@
 #include <curl/curl.h>
 #include "json.hpp"
 
+using namespace std;
 using json = nlohmann::json;
 
 // Callback to capture response from curl
-size_t WriteCallback(void *contents, size_t size, size_t nmemb, std::string *output)
-{
+size_t WriteCallback(void* contents, size_t size, size_t nmemb, string* output) {
     size_t totalSize = size * nmemb;
-    output->append((char *)contents, totalSize);
+    output->append((char*)contents, totalSize);
     return totalSize;
 }
 
-std::string askGemini(const std::string &prompt, const std::string &apiKey)
-{
-    CURL *curl;
+// Function to send prompt to Gemini and get a response
+string askGemini(const string& prompt, const string& apiKey) {
+    CURL* curl;
     CURLcode res;
-    std::string responseBuffer;
+    string responseBuffer;
 
-    std::string url = "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=" + apiKey;
+    string url = "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=" + apiKey;
 
     json requestJson = {
-        {"contents", {{{"role", "user"}, {"parts", {{{"text", prompt}}}}}}}};
-
-    std::string requestBody = requestJson.dump();
+        {"contents", {
+            {
+                {"role", "user"},
+                {"parts", { {{"text", prompt}} }}
+            }
+        }}
+    };
 
     curl = curl_easy_init();
-    if (curl)
-    {
-        struct curl_slist *headers = NULL;
-        headers = curl_slist_append(headers, "Content-Type: application/json");
+    if (!curl) return "❌ Failed to initialize cURL.";
 
-        curl_easy_setopt(curl, CURLOPT_URL, url.c_str());
-        curl_easy_setopt(curl, CURLOPT_HTTPHEADER, headers);
-        curl_easy_setopt(curl, CURLOPT_POSTFIELDS, requestBody.c_str());
-        curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, WriteCallback);
-        curl_easy_setopt(curl, CURLOPT_WRITEDATA, &responseBuffer);
+    string requestBody = requestJson.dump();
 
-        res = curl_easy_perform(curl);
+    struct curl_slist* headers = nullptr;
+    headers = curl_slist_append(headers, "Content-Type: application/json");
 
-        if (res != CURLE_OK)
-        {
-            curl_easy_cleanup(curl);
-            curl_slist_free_all(headers);
-            return "❌ Failed to reach Gemini API. Check your internet connection.";
-        }
+    curl_easy_setopt(curl, CURLOPT_URL, url.c_str());
+    curl_easy_setopt(curl, CURLOPT_HTTPHEADER, headers);
+    curl_easy_setopt(curl, CURLOPT_POSTFIELDS, requestBody.c_str());
+    curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, WriteCallback);
+    curl_easy_setopt(curl, CURLOPT_WRITEDATA, &responseBuffer);
 
-        curl_easy_cleanup(curl);
-        curl_slist_free_all(headers);
-    }
-    else
-    {
-        return "❌ Failed to initialize cURL.";
+    res = curl_easy_perform(curl);
+
+    curl_easy_cleanup(curl);
+    curl_slist_free_all(headers);
+
+    if (res != CURLE_OK) {
+        return "❌ Request failed. Check your internet or API key.";
     }
 
-    try
-    {
+    try {
         auto responseJson = json::parse(responseBuffer);
-
-        // Check if candidates exist
         if (responseJson.contains("candidates") &&
-            responseJson["candidates"].size() > 0 &&
-            responseJson["candidates"][0]["content"]["parts"].size() > 0)
-        {
+            !responseJson["candidates"].empty() &&
+            !responseJson["candidates"][0]["content"]["parts"].empty()) {
+
             return responseJson["candidates"][0]["content"]["parts"][0]["text"];
         }
-        else
-        {
-            return "⚠️ Gemini API did not return a valid response.";
+        return "⚠️ No valid response from Gemini.";
+    } catch (...) {
+        return "⚠️ Could not parse Gemini's response.";
+    }
+}
+
+// Text-to-speech using Festival
+void speakText(const string& text) {
+    string command = "echo \"" + text + "\" | festival --tts";
+    system(command.c_str());
+}
+
+// Main loop
+int main() {
+    string apiKey = "AIzaSyAUFjvZ_0n1nnBkryA8iNS4ZAkmnCQ7Z1U"; // Replace with your real API key
+    string input;
+
+    cout << "🤖 Luma Virtual Assistant (type 'exit' to quit)\n\n";
+
+    while (true) {
+        cout << "You: ";
+        getline(cin, input);
+
+        if (input == "exit") break;
+
+        string response = askGemini(input, apiKey);
+
+        // Replace '*' with space (optional)
+        for (char& c : response) {
+            if (c == '*') c = ' ';
         }
-    }
-    catch (...)
-    {
-        return "⚠️ Failed to parse the response. It might be malformed.";
-    }
-}
 
-//Text to speech Gemini
-void speakText(const std::string& text) {
-std::string command = "echo \"" + text + "\" | festival --tts";
-system(command.c_str());
-}
-
-int main()
-{
-    std::string apiKey = "AIzaSyAUFjvZ_0n1nnBkryA8iNS4ZAkmnCQ7Z1U"; // <- Replace this with your real Gemini API key
-    std::string input;
-
-    std::cout << "🤖 Luma Virtual Assistant (Type 'exit' to quit)\n\n";
-
-    while (true)
-    {
-        std::cout << "You: ";
-        std::getline(std::cin, input);
-
-        if (input == "exit")
-            break;
-
-        std::string response = askGemini(input, apiKey);
-        std::cout << "Gemini: " << response << "\n\n";
-
-        // Speak it out
+        cout << "Gemini: " << response << "\n\n";
         speakText(response);
     }
 
