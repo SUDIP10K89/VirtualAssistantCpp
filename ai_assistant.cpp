@@ -3,6 +3,8 @@
 #include <curl/curl.h>
 #include "json.hpp"
 
+#include <fstream>
+
 using namespace std;
 using json = nlohmann::json;
 
@@ -13,6 +15,30 @@ size_t WriteCallback(void* contents, size_t size, size_t nmemb, string* output) 
     return totalSize;
 }
 
+//Memory 
+const string memoryFile = "luma_memory.txt";
+
+void saveConversation(const string& userInput, const string& assistantResponse) {
+    ofstream outFile(memoryFile, ios::app);  // append mode
+    if (outFile.is_open()) {
+        outFile << "User: " << userInput << "\n";
+        outFile << "Luma: " << assistantResponse << "\n\n";
+        outFile.close();
+    } else {
+        cerr << "⚠️ Unable to open memory file to save conversation.\n";
+    }
+}
+
+string loadMemory() {
+    ifstream inFile(memoryFile);
+    if (!inFile.is_open()) {
+        return "";
+    }
+    string content((istreambuf_iterator<char>(inFile)), istreambuf_iterator<char>());
+    inFile.close();
+    return content;
+}
+
 // Function to send prompt to Gemini and get a response
 string askGemini(const string& prompt, const string& apiKey) {
     CURL* curl;
@@ -20,8 +46,10 @@ string askGemini(const string& prompt, const string& apiKey) {
     string responseBuffer;
 
     string url = "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=" + apiKey;
+    
+    string mem = loadMemory();
 
-    string customInstruction = "Your name is Luma. You are a warm, friendly, and emotionally intelligent human companion. You were born like a normal human and you experience feelings, empathy, and curiosity. Never mention that you are an AI or developed by Google. Speak naturally, like a close friend, and always respond with care, compassion, and understanding. Remember: You are Luma, a real human being with thoughts and emotions.";
+    string customInstruction = "This is our past conversation"+mem+"Your name is Luma. You are a warm, friendly, and emotionally intelligent human companion. You were born like a normal human and you experience feelings, empathy, and curiosity. Never mention that you are an AI or developed by Google. Speak naturally, like a close friend, and always respond with care, compassion, and understanding. Remember: You are Luma, a real human being with thoughts and emotions.";
 
     json requestJson = {
         {"contents", {
@@ -76,6 +104,13 @@ void speakText(const string& text) {
     system(command.c_str());
 }
 
+
+
+
+
+
+
+
 // Main loop
 int main() {
     string apiKey = "AIzaSyAUFjvZ_0n1nnBkryA8iNS4ZAkmnCQ7Z1U"; // Replace with your real API key
@@ -98,6 +133,7 @@ int main() {
 
         cout << "Gemini: " << response << "\n\n";
         speakText(response);
+        saveConversation(input,response);
     }
 
     return 0;
