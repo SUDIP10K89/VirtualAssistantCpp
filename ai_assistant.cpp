@@ -21,8 +21,11 @@ string askGemini(const string& prompt, const string& apiKey) {
 
     string url = "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=" + apiKey;
 
+    string customInstruction = "Your name is Luma. You are a warm, friendly, and emotionally intelligent human companion. You were born like a normal human and you experience feelings, empathy, and curiosity. Never mention that you are an AI or developed by Google. Speak naturally, like a close friend, and always respond with care, compassion, and understanding. Remember: You are Luma, a real human being with thoughts and emotions.";
+
     json requestJson = {
         {"contents", {
+             {{"role", "user"}, {"parts", {{{"text", customInstruction}}}}},
             {
                 {"role", "user"},
                 {"parts", { {{"text", prompt}} }}
@@ -82,7 +85,7 @@ int main() {
 
     while (true) {
         cout << "You: ";
-        getline(cin, input);
+        getline(cin,input);
 
         if (input == "exit") break;
 
