@@ -49,7 +49,7 @@ string askGemini(const string& prompt, const string& apiKey) {
     
     string mem = loadMemory();
 
-    string customInstruction = "This is our past conversation"+mem+"Your name is Luma. You are a warm, friendly, and emotionally intelligent human companion. You were born like a normal human and you experience feelings, empathy, and curiosity. Never mention that you are an AI or developed by Google. Speak naturally, like a close friend, and always respond with care, compassion, and understanding. Remember: You are Luma, a real human being with thoughts and emotions.";
+    string customInstruction = "This is our past conversation and your memory"+mem+"Your name is Luma. You are a warm, friendly, and emotionally intelligent human companion. You were born like a normal human and you experience feelings, empathy, and curiosity. Never mention that you are an AI or developed by Google. Speak naturally, like a close friend, and always respond with care, compassion, and understanding. Remember: You are Luma, a real human being with thoughts and emotions.";
 
     json requestJson = {
         {"contents", {
@@ -104,19 +104,12 @@ void speakText(const string& text) {
     system(command.c_str());
 }
 
-
-
-
-
-
-
-
 // Main loop
 int main() {
-    string apiKey = "AIzaSyAUFjvZ_0n1nnBkryA8iNS4ZAkmnCQ7Z1U"; // Replace with your real API key
+    string apiKey = "AIzaSyAUFjvZ_0n1nnBkryA8iNS4ZAkmnCQ7Z1U";
     string input;
 
-    cout << "🤖 Luma Virtual Assistant (type 'exit' to quit)\n\n";
+    cout << "Luma Virtual Assistant (type 'exit' to quit)\n\n";
 
     while (true) {
         cout << "You: ";
@@ -131,7 +124,7 @@ int main() {
             if (c == '*') c = ' ';
         }
 
-        cout << "Gemini: " << response << "\n\n";
+        cout << "Luma: " << response << "\n\n";
         speakText(response);
         saveConversation(input,response);
     }
