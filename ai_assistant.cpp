@@ -105,29 +105,3 @@ void speakText(const string& text) {
 }
 
 // Main loop
-int main() {
-    string apiKey = "AIzaSyAUFjvZ_0n1nnBkryA8iNS4ZAkmnCQ7Z1U";
-    string input;
-
-    cout << "Luma Virtual Assistant (type 'exit' to quit)\n\n";
-
-    while (true) {
-        cout << "You: ";
-        getline(cin,input);
-
-        if (input == "exit") break;
-
-        string response = askGemini(input, apiKey);
-
-        // Replace '*' with space (optional)
-        for (char& c : response) {
-            if (c == '*') c = ' ';
-        }
-
-        cout << "Luma: " << response << "\n\n";
-        speakText(response);
-        saveConversation(input,response);
-    }
-
-    return 0;
-}

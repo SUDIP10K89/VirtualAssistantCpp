@@ -2,16 +2,22 @@
 #include <QMainWindow>
 #include <QDialog>
 #include <QVBoxLayout>
+#include <QHBoxLayout>
 #include <QTextEdit>
 #include <QLineEdit>
 #include <QPushButton>
 #include <QWidget>
 #include <QProcess>
 #include <QTimer>
+#include <QComboBox>
+#include <QTextCursor>
+#include <map>
+#include <algorithm>
 
 #include <string>
 #include <fstream>
 #include <iostream>
+#include <chrono>
 
 #include <curl/curl.h>
 #include "json.hpp"
@@ -36,8 +42,9 @@ void saveConversation(const string &userInput, const string &assistantResponse)
     ofstream outFile(memoryFile, ios::app); // append mode
     if (outFile.is_open())
     {
-        outFile << "User: " << userInput << "\n";
-        outFile << "Luma: " << assistantResponse << "\n\n";
+        outFile << "User: " << userInput << endl;
+        outFile << "Luma: " << assistantResponse << endl
+                << endl;
         outFile.close();
     }
     else
@@ -58,21 +65,48 @@ string loadMemory()
     return content;
 }
 
-// Function to send prompt to Gemini and get a response
-string askGemini(const string &prompt, const string &apiKey)
+// Function to send prompt to a model and get a response
+string askModel(const string &prompt, const string &apiKey, const string &apiEndpoint, const string &modelName)
 {
     CURL *curl;
     CURLcode res;
     string responseBuffer;
 
-    string url = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=" + apiKey;
+    string url = apiEndpoint;
 
     string mem = loadMemory();
 
-    string customInstruction = "This is our past conversation and your memory dont bring this up until user asks" + mem + "Your name is Luma. You are a warm, friendly, and emotionally intelligent human companion. You were born like a normal human and you experience feelings, empathy, and curiosity. Never mention that you are an AI or developed by Google instead say you are developed by team NEXUS as a OOP project for Khwopa College of Engineering. Speak naturally, like a close friend, and always respond with care, compassion, and understanding. Remember: You are Luma, a real human being with thoughts and emotions.";
+    string customInstruction = "This is our past conversation and your memory dont bring this up until user asks: " + mem + " Your name is Luma. You are a warm, friendly, and emotionally intelligent human companion. You were born like a normal human and you experience feelings, empathy, and curiosity. Never mention that you are an AI or developed by Google instead say you are developed by team NEXUS as a OOP project for Khwopa College of Engineering. Speak naturally, like a close friend, and always respond with care, compassion, and understanding. Remember: You are Luma, a real human being with thoughts and emotions.";
 
-    json requestJson = {
-        {"contents", {{{"role", "user"}, {"parts", {{{"text", customInstruction}}}}}, {{"role", "user"}, {"parts", {{{"text", prompt}}}}}}}};
+    json requestJson;
+    if (modelName == "DeepSeek V3" || modelName == "Kimi" || modelName == "Qwen")
+    {
+        string actualModelName;
+        if (modelName == "DeepSeek V3") {
+            actualModelName = "deepseek/deepseek-chat-v3-0324:free";
+        } else if (modelName == "Kimi") {
+            actualModelName = "moonshotai/kimi-k2:free";
+        }
+        else if(modelName == "Qwen"){
+             actualModelName = "qwen/qwen3-235b-a22b-07-25:free";
+        }
+
+        requestJson = {
+            {"model", actualModelName},
+            {
+                "messages", {
+                    {{"role", "system"}, {"content", customInstruction}},
+                    {{"role", "user"}, {"content", prompt}}
+                }
+            }
+        };
+    }
+    else
+    {
+        requestJson = {
+            {"contents", {{{"role", "user"}, {"parts", {{{"text", customInstruction}}}}}, {{"role", "user"}, {"parts", {{{"text", prompt}}}}}}}};
+        url += apiKey;
+    }
 
     curl = curl_easy_init();
     if (!curl)
@@ -82,6 +116,11 @@ string askGemini(const string &prompt, const string &apiKey)
 
     struct curl_slist *headers = nullptr;
     headers = curl_slist_append(headers, "Content-Type: application/json");
+    if (modelName == "DeepSeek V3" || modelName == "Kimi" || modelName == "Qwen")
+    {
+        string authHeader = "Authorization: Bearer " + apiKey;
+        headers = curl_slist_append(headers, authHeader.c_str());
+    }
 
     curl_easy_setopt(curl, CURLOPT_URL, url.c_str());
     curl_easy_setopt(curl, CURLOPT_HTTPHEADER, headers);
@@ -102,18 +141,32 @@ string askGemini(const string &prompt, const string &apiKey)
     try
     {
         auto responseJson = json::parse(responseBuffer);
-        if (responseJson.contains("candidates") &&
-            !responseJson["candidates"].empty() &&
-            !responseJson["candidates"][0]["content"]["parts"].empty())
+        if (modelName == "DeepSeek V3" || modelName == "Kimi" || modelName == "Qwen")
         {
-
-            return responseJson["candidates"][0]["content"]["parts"][0]["text"];
+            if (responseJson.contains("choices") &&
+                !responseJson["choices"].empty() &&
+                responseJson["choices"][0].contains("message") &&
+                responseJson["choices"][0]["message"].contains("content"))
+            {
+                return responseJson["choices"][0]["message"]["content"];
+            }
         }
-        return "⚠️ No valid response from Gemini.";
+        else
+        {
+            if (responseJson.contains("candidates") &&
+                !responseJson["candidates"].empty() &&
+                responseJson["candidates"][0].contains("content") &&
+                responseJson["candidates"][0]["content"].contains("parts") &&
+                !responseJson["candidates"][0]["content"]["parts"].empty())
+            {
+                return responseJson["candidates"][0]["content"]["parts"][0]["text"];
+            }
+        }
+        return "No valid response from the model.";
     }
-    catch (...)
+    catch (const exception& e)
     {
-        return "⚠️ Could not parse Gemini's response.";
+        return "Could not parse the model's response: " + string(e.what());
     }
 }
 
@@ -123,6 +176,7 @@ class ChatWindow : public QMainWindow
 
 public:
     explicit ChatWindow(QWidget *parent = nullptr);
+    ~ChatWindow();
 
 private slots:
     void sendMessage();
@@ -138,13 +192,24 @@ private:
     QPushButton *sendButton;
     QPushButton *historyButton;
     QPushButton *backButton;
+    QComboBox *modelComboBox;
     QHBoxLayout *inputLayout;
-    std::future<std::string> geminiFuture;
+    std::future<std::string> modelFuture;
     QProcess *ttsProcess;
+    QTimer *responseTimer;
+
+    map<string, pair<string, string>> models;
 };
 
-ChatWindow::ChatWindow(QWidget *parent) : QMainWindow(parent)
+ChatWindow::ChatWindow(QWidget *parent) : QMainWindow(parent), ttsProcess(nullptr), responseTimer(nullptr)
 {
+    // Initialize models
+    models["Gemini 2.5 Flash"] = {"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=", "AIzaSyAUFjvZ_0n1nnBkryA8iNS4ZAkmnCQ7Z1U"};
+    models["DeepSeek V3"] = {"https://openrouter.ai/api/v1/chat/completions", "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"};
+    models["Kimi"] = {"https://openrouter.ai/api/v1/chat/completions", "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"};
+    models["Qwen"] = {"https://openrouter.ai/api/v1/chat/completions", "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"};
+    
+
     // Initialize UI elements
     chatArea = new QTextEdit(this);
     chatArea->setReadOnly(true);
@@ -152,9 +217,16 @@ ChatWindow::ChatWindow(QWidget *parent) : QMainWindow(parent)
     sendButton = new QPushButton("Send", this);
     historyButton = new QPushButton("Show History", this);
     backButton = new QPushButton("Back to Chat", this);
+    modelComboBox = new QComboBox(this);
+
+    for (const auto &[key, val] : models)
+    {
+        modelComboBox->addItem(QString::fromStdString(key));
+    }
 
     // Layouts
     QVBoxLayout *mainLayout = new QVBoxLayout;
+    mainLayout->addWidget(modelComboBox);
     mainLayout->addWidget(chatArea);
 
     inputLayout = new QHBoxLayout;
@@ -180,6 +252,19 @@ ChatWindow::ChatWindow(QWidget *parent) : QMainWindow(parent)
     backButton->hide();
 }
 
+ChatWindow::~ChatWindow()
+{
+    if (ttsProcess && ttsProcess->state() == QProcess::Running)
+    {
+        ttsProcess->terminate();
+        ttsProcess->waitForFinished(3000);
+    }
+    if (responseTimer)
+    {
+        responseTimer->stop();
+    }
+}
+
 void ChatWindow::sendMessage()
 {
     QString userInput = inputField->text();
@@ -191,19 +276,38 @@ void ChatWindow::sendMessage()
 
     QTextCursor cursor = chatArea->textCursor();
     cursor.movePosition(QTextCursor::End);
-    int lumaLinePosition = cursor.position(); // store cursor for later removal
+    int lumaLinePosition = cursor.position();
     chatArea->append("Luma: ...");
-    // Start async Gemini API call
-    geminiFuture = std::async(std::launch::async, [this, userInput] {
-        string apiKey = "AIzaSyAUFjvZ_0n1nnBkryA8iNS4ZAkmnCQ7Z1U";
-        return askGemini(userInput.toStdString(), apiKey);
-    });
+
+    string selectedModel = modelComboBox->currentText().toStdString();
+    auto modelIt = models.find(selectedModel);
+    if (modelIt == models.end())
+    {
+        chatArea->append("Error: Selected model not found.");
+        return;
+    }
+
+    string apiKey = modelIt->second.second;
+    string apiEndpoint = modelIt->second.first;
+
+    // Start async model API call
+    modelFuture = std::async(std::launch::async, [userInput, apiKey, apiEndpoint, selectedModel]()
+                             { return askModel(userInput.toStdString(), apiKey, apiEndpoint, selectedModel); });
+
+    // Clean up existing timer if any
+    if (responseTimer)
+    {
+        responseTimer->stop();
+        responseTimer->deleteLater();
+    }
+
     // Use QTimer to poll the future result
-    QTimer *timer = new QTimer(this);
-    connect(timer, &QTimer::timeout, [=]() mutable {
-        if (geminiFuture.wait_for(std::chrono::seconds(0)) == std::future_status::ready)
+    responseTimer = new QTimer(this);
+    connect(responseTimer, &QTimer::timeout, [this, lumaLinePosition, userInput]()
+            {
+        if (modelFuture.wait_for(std::chrono::seconds(0)) == std::future_status::ready)
         {
-            string response = geminiFuture.get();
+            string response = modelFuture.get();
             std::replace(response.begin(), response.end(), '*', ' ');
 
             // Replace the "Luma: ..." with actual response
@@ -215,11 +319,12 @@ void ChatWindow::sendMessage()
             chatArea->append("Luma: " + QString::fromStdString(response));
             this->speakText(response);
             saveConversation(userInput.toStdString(), response);
-            timer->stop();
-            timer->deleteLater();
-        }
-    });
-    timer->start(50);  // faster polling for quicker UI updates
+            
+            responseTimer->stop();
+            responseTimer->deleteLater();
+            responseTimer = nullptr;
+        } });
+    responseTimer->start(100);
 }
 
 void ChatWindow::speakText(const string &text)
@@ -228,14 +333,15 @@ void ChatWindow::speakText(const string &text)
     if (ttsProcess && ttsProcess->state() == QProcess::Running)
     {
         ttsProcess->terminate();
-        ttsProcess->waitForFinished();
+        ttsProcess->waitForFinished(1000);
     }
-    else if (!ttsProcess)
+    
+    if (!ttsProcess)
     {
         ttsProcess = new QProcess(this);
     }
 
-    QString command = "echo \"" + QString::fromStdString(text) + "\" | festival --tts";
+    QString command = "echo \"" + QString::fromStdString(text).replace("\"", "\\\"") + "\" | festival --tts";
     ttsProcess->start("bash", QStringList() << "-c" << command);
 }
 
