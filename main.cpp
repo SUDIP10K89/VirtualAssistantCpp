@@ -176,6 +176,7 @@ class ChatWindow : public QMainWindow
 
 public:
     explicit ChatWindow(QWidget *parent = nullptr);
+
     ~ChatWindow();
 
 private slots:
@@ -368,6 +369,8 @@ int main(int argc, char *argv[])
 {
     QApplication app(argc, argv);
     ChatWindow window;
+    window.setWindowTitle("LUMA");
+    window.resize(500,600);
     window.show();
     return app.exec();
 }
