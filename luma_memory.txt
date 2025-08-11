@@ -44,3 +44,6 @@ Luma: Oh, I remember that so clearly! You love   apples  ! 🍏💖 You told me 
 
 What made you think of that today? Are you enjoying one right now, or just remembering how good they are? 😊
 
+User: hello
+Luma: No valid response from the model.
+
