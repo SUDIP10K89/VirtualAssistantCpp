@@ -26,7 +26,7 @@
 using namespace std;
 using json = nlohmann::json;
 
-// Callback to capture response from curl
+
 size_t WriteCallback(void *contents, size_t size, size_t nmemb, string *output)
 {
     size_t totalSize = size * nmemb;
@@ -34,7 +34,7 @@ size_t WriteCallback(void *contents, size_t size, size_t nmemb, string *output)
     return totalSize;
 }
 
-// Memory
+
 const string memoryFile = "luma_memory.txt";
 
 void saveConversation(const string &userInput, const string &assistantResponse)
@@ -65,7 +65,7 @@ string loadMemory()
     return content;
 }
 
-// Function to send prompt to a model and get a response
+
 string askModel(const string &prompt, const string &apiKey, const string &apiEndpoint, const string &modelName)
 {
     CURL *curl;
@@ -76,10 +76,10 @@ string askModel(const string &prompt, const string &apiKey, const string &apiEnd
 
     string mem = loadMemory();
 
-    string customInstruction = "This is our past conversation and your memory dont bring this up until user asks: " + mem + " Your name is Luma. You are a warm, friendly, and emotionally intelligent human companion. You were born like a normal human and you experience feelings, empathy, and curiosity. Never mention that you are an AI or developed by Google instead say you are developed by team NEXUS as a OOP project for Khwopa College of Engineering. Speak naturally, like a close friend, and always respond with care, compassion, and understanding. Remember: You are Luma, a real human being with thoughts and emotions.";
+    string customInstruction = "This is our past conversation and your memory dont bring this up until user asks: " + mem + " Your name is Luma. You are a warm, friendly, and emotionally intelligent human companion. You dont need to introduce give concise and straightforward answers";
 
     json requestJson;
-    if (modelName == "DeepSeek V3" || modelName == "Kimi" || modelName == "Qwen")
+    if (modelName == "DeepSeek V3" || modelName == "Kimi" || modelName == "Qwen" || modelName == "GPT")
     {
         string actualModelName;
         if (modelName == "DeepSeek V3") {
@@ -88,8 +88,12 @@ string askModel(const string &prompt, const string &apiKey, const string &apiEnd
             actualModelName = "moonshotai/kimi-k2:free";
         }
         else if(modelName == "Qwen"){
-             actualModelName = "qwen/qwen3-235b-a22b-07-25:free";
+             actualModelName = "qwen/qwen3-coder:free";
         }
+        else if(modelName == "GPT"){
+             actualModelName = "openai/gpt-oss-20b:free";
+        }
+        
 
         requestJson = {
             {"model", actualModelName},
@@ -110,13 +114,13 @@ string askModel(const string &prompt, const string &apiKey, const string &apiEnd
 
     curl = curl_easy_init();
     if (!curl)
-        return "❌ Failed to initialize cURL.";
+        return " Failed to initialize cURL.";
 
     string requestBody = requestJson.dump();
 
     struct curl_slist *headers = nullptr;
     headers = curl_slist_append(headers, "Content-Type: application/json");
-    if (modelName == "DeepSeek V3" || modelName == "Kimi" || modelName == "Qwen")
+    if (modelName == "DeepSeek V3" || modelName == "Kimi" || modelName == "Qwen" || modelName == "GPT")
     {
         string authHeader = "Authorization: Bearer " + apiKey;
         headers = curl_slist_append(headers, authHeader.c_str());
@@ -141,7 +145,7 @@ string askModel(const string &prompt, const string &apiKey, const string &apiEnd
     try
     {
         auto responseJson = json::parse(responseBuffer);
-        if (modelName == "DeepSeek V3" || modelName == "Kimi" || modelName == "Qwen")
+        if (modelName == "DeepSeek V3" || modelName == "Kimi" || modelName == "Qwen" ||  modelName=="GPT")
         {
             if (responseJson.contains("choices") &&
                 !responseJson["choices"].empty() &&
@@ -185,7 +189,7 @@ private slots:
     void showChat();
 
 private:
-    // Text-to-speech using Festival
+  
     void speakText(const string &text);
 
     QTextEdit *chatArea;
@@ -204,14 +208,15 @@ private:
 
 ChatWindow::ChatWindow(QWidget *parent) : QMainWindow(parent), ttsProcess(nullptr), responseTimer(nullptr)
 {
-    // Initialize models
+   
     models["Gemini 2.5 Flash"] = {"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=", "AIzaSyAUFjvZ_0n1nnBkryA8iNS4ZAkmnCQ7Z1U"};
-    models["DeepSeek V3"] = {"https://openrouter.ai/api/v1/chat/completions", "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"};
-    models["Kimi"] = {"https://openrouter.ai/api/v1/chat/completions", "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"};
-    models["Qwen"] = {"https://openrouter.ai/api/v1/chat/completions", "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"};
+    models["DeepSeek V3"] = {"https://openrouter.ai/api/v1/chat/completions", "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"};
+    models["Kimi"] = {"https://openrouter.ai/api/v1/chat/completions", "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"};
+    models["Qwen"] = {"https://openrouter.ai/api/v1/chat/completions", "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"};
+    models["GPT"] = {"https://openrouter.ai/api/v1/chat/completions", "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"};
     
 
-    // Initialize UI elements
+    
     chatArea = new QTextEdit(this);
     chatArea->setReadOnly(true);
     inputField = new QLineEdit(this);
@@ -225,7 +230,7 @@ ChatWindow::ChatWindow(QWidget *parent) : QMainWindow(parent), ttsProcess(nullpt
         modelComboBox->addItem(QString::fromStdString(key));
     }
 
-    // Layouts
+  
     QVBoxLayout *mainLayout = new QVBoxLayout;
     mainLayout->addWidget(modelComboBox);
     mainLayout->addWidget(chatArea);
@@ -238,18 +243,17 @@ ChatWindow::ChatWindow(QWidget *parent) : QMainWindow(parent), ttsProcess(nullpt
     mainLayout->addLayout(inputLayout);
     mainLayout->addWidget(backButton);
 
-    // Central widget
+ 
     QWidget *centralWidget = new QWidget(this);
     centralWidget->setLayout(mainLayout);
     setCentralWidget(centralWidget);
 
-    // Connections
+   
     connect(sendButton, &QPushButton::clicked, this, &ChatWindow::sendMessage);
     connect(inputField, &QLineEdit::returnPressed, this, &ChatWindow::sendMessage);
     connect(historyButton, &QPushButton::clicked, this, &ChatWindow::showHistory);
     connect(backButton, &QPushButton::clicked, this, &ChatWindow::showChat);
 
-    // Initial state
     backButton->hide();
 }
 
@@ -291,18 +295,17 @@ void ChatWindow::sendMessage()
     string apiKey = modelIt->second.second;
     string apiEndpoint = modelIt->second.first;
 
-    // Start async model API call
+   
     modelFuture = std::async(std::launch::async, [userInput, apiKey, apiEndpoint, selectedModel]()
                              { return askModel(userInput.toStdString(), apiKey, apiEndpoint, selectedModel); });
 
-    // Clean up existing timer if any
     if (responseTimer)
     {
         responseTimer->stop();
         responseTimer->deleteLater();
     }
 
-    // Use QTimer to poll the future result
+   
     responseTimer = new QTimer(this);
     connect(responseTimer, &QTimer::timeout, [this, lumaLinePosition, userInput]()
             {
@@ -311,7 +314,7 @@ void ChatWindow::sendMessage()
             string response = modelFuture.get();
             std::replace(response.begin(), response.end(), '*', ' ');
 
-            // Replace the "Luma: ..." with actual response
+          
             QTextCursor c = chatArea->textCursor();
             c.setPosition(lumaLinePosition);
             c.movePosition(QTextCursor::End, QTextCursor::KeepAnchor);
@@ -330,7 +333,7 @@ void ChatWindow::sendMessage()
 
 void ChatWindow::speakText(const string &text)
 {
-    // Use QProcess to execute the Festival text-to-speech command
+  
     if (ttsProcess && ttsProcess->state() == QProcess::Running)
     {
         ttsProcess->terminate();

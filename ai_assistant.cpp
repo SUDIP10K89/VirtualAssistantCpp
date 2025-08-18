@@ -25,7 +25,7 @@ void saveConversation(const string& userInput, const string& assistantResponse) 
         outFile << "Luma: " << assistantResponse << "\n\n";
         outFile.close();
     } else {
-        cerr << "⚠️ Unable to open memory file to save conversation.\n";
+        cerr << "Unable to open memory file to save conversation.\n";
     }
 }
 
@@ -62,7 +62,7 @@ string askGemini(const string& prompt, const string& apiKey) {
     };
 
     curl = curl_easy_init();
-    if (!curl) return "❌ Failed to initialize cURL.";
+    if (!curl) return " Failed to initialize cURL.";
 
     string requestBody = requestJson.dump();
 
@@ -81,7 +81,7 @@ string askGemini(const string& prompt, const string& apiKey) {
     curl_slist_free_all(headers);
 
     if (res != CURLE_OK) {
-        return "❌ Request failed. Check your internet or API key.";
+        return "Request failed. Check your internet or API key.";
     }
 
     try {
@@ -92,9 +92,9 @@ string askGemini(const string& prompt, const string& apiKey) {
 
             return responseJson["candidates"][0]["content"]["parts"][0]["text"];
         }
-        return "⚠️ No valid response from Gemini.";
+        return " No valid response from Gemini.";
     } catch (...) {
-        return "⚠️ Could not parse Gemini's response.";
+        return "Could not parse Gemini's response.";
     }
 }
 
@@ -105,3 +105,33 @@ void speakText(const string& text) {
 }
 
 // Main loop
+int main() {
+    string apiKey = "AIzaSyAUFjvZ_0n1nnBkryA8iNS4ZAkmnCQ7Z1U";
+
+    cout << "\n\nHello, I’m Luma. Let's chat! (type 'exit' to quit)\n\n";
+
+    while (true) {
+        string userInput;
+        cout << "You: ";
+        getline(cin, userInput);
+
+        if (userInput == "exit") {
+            cout << " Goodbye, take care!\n";
+            break;
+        }
+
+        // Get response from Gemini
+        string assistantResponse = askGemini(userInput, apiKey);
+
+        // Print response
+        cout << "Luma: " << assistantResponse << "\n\n";
+
+        // Save conversation
+        saveConversation(userInput, assistantResponse);
+
+        // Speak response
+        speakText(assistantResponse);
+    }
+
+    return 0;
+}
