@@ -40,7 +40,7 @@ sudo apt-get install qtbase5-dev libcurl4-openssl-dev festival
 ### 2. Clone Repository
 
 ```bash
-git clone https://github.com/your-username/luma-chat.git
+git clone https://github.com/SUDIP10K89/VirtualAssistantCpp
 cd luma-chat
 ```
 
@@ -53,13 +53,6 @@ qmake
 make
 ```
 
-Or using **CMake** (if you add a CMakeLists.txt):
-
-```bash
-mkdir build && cd build
-cmake ..
-make
-```
 
 ### 4. Run
 
